@@ -10,11 +10,11 @@ PATH_2024 = "Data_NDVI_Lamongan_2024.csv"
 def load_raw_data(progress_callback=None):
     """Baca CSV lokal, gabungkan, bersihkan, buat grid spasial."""
     if progress_callback: progress_callback(0.10, "📂 Membaca data 2023...")
-    df_2023 = pd.read_csv('Data_NDVI_Lamongan_2023.csv', parse_dates=['tanggal'])
+    df_2023 = pd.read_csv(PATH_2023, parse_dates=['tanggal'])
     df_2023['tahun'] = '2023'
 
     if progress_callback: progress_callback(0.30, "📂 Membaca data 2024...")
-    df_2024 = pd.read_csv('Data_NDVI_Lamongan_2024.csv', parse_dates=['tanggal'])
+    df_2024 = pd.read_csv(PATH_2024, parse_dates=['tanggal'])
     df_2024['tahun'] = '2024'
 
     if progress_callback: progress_callback(0.50, "🔗 Menggabungkan & membersihkan...")
