@@ -1,63 +1,56 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-from data_loader import load_and_preprocess_data
-from clustering import run_clustering
-from visualization import calculate_metrics, plot_comparison, plot_individual_clusters, plot_spatial_map
+import numpy as np
+import re
+from streamlit_drawable_canvas import st_canvas
+from data_loader import load_base_data, filter_by_year
+from clustering import preprocess_ts, run_clustering
+from visualization import plot_spatial_grid, plot_interactive_trends
 
-st.set_page_config(page_title="Analisis Fenologi Padi", layout="wide")
-st.title("🌾 Analisis Fenologi Padi Berbasis NDVI & Clustering")
+st.set_page_config(page_title="Monitoring Padi", layout="wide")
 
-# Sidebar Controls
-st.sidebar.header("⚙️ Parameter Pengolahan")
-TARGET_YEAR = st.sidebar.selectbox("Tahun Target", ["2023", "2024"], index=1)
-WINDOW_SIZE = st.sidebar.slider("Window Size (Savgol)", 11, 51, 31, step=2)
-POLY_ORDER = st.sidebar.slider("Polynomial Order", 2, 5, 2)
+st.title("🌾 Rice Phenology Analysis Dashboard")
 
-st.sidebar.header("🔍 Parameter Clustering")
-MIN_CLUSTER_SIZE = st.sidebar.slider("Min Cluster Size", 2, 20, 3)
-MIN_SAMPLES = st.sidebar.slider("Min Samples", 1, 10, 2)
-EPSILON = st.sidebar.slider("Cluster Selection Epsilon", 0.0, 0.2, 0.05, 0.01)
+# Sidebar
+st.sidebar.header("Konfigurasi")
+file = st.sidebar.file_uploader("Upload CSV Data", type=['csv'])
+year = st.sidebar.selectbox("Pilih Tahun", [2023, 2024, 2025])
+min_c = st.sidebar.slider("Minimal Anggota Cluster", 2, 20, 5)
 
-# Load Data
-with st.spinner("📥 Memuat dan memproses data..."):
-    file_2023 = "Data_NDVI_Lamongan_2023.csv"
-    file_2024 = "Data_NDVI_Lamongan_2024.csv"
-    try:
-        df_final, nr, nc = load_and_preprocess_data(file_2023, file_2024, WINDOW_SIZE, POLY_ORDER)
-        df = df_final[df_final['tahun'] == str(TARGET_YEAR)].copy()
-        st.success(f"✅ Data berhasil dimuat: `{len(df):,}` baris untuk tahun `{TARGET_YEAR}`")
-    except FileNotFoundError:
-        st.error("❌ File CSV tidak ditemukan. Pastikan `Data_NDVI_Lamongan_2023.csv` dan `Data_NDVI_Lamongan_2024.csv` berada di folder yang sama.")
-        st.stop()
+if file:
+    df = load_base_data(file)
+    df_filtered = filter_by_year(df, year)
+    
+    col1, col2 = st.columns([1, 1.2])
+    
+    with col1:
+        st.subheader("📍 Seleksi Area Spasial")
+        # Fitur Canvas sebagai pengganti 'lingkaran geser' di Notebook
+        canvas_result = st_canvas(
+            fill_color="rgba(255, 165, 0, 0.3)",
+            stroke_width=15,
+            drawing_mode="freedraw",
+            key="canvas",
+            height=400, width=400
+        )
+        run_btn = st.button("🚀 Jalankan Clustering")
 
-# Trigger Clustering
-if st.sidebar.button("🚀 Jalankan Clustering", type="primary"):
-    with st.spinner("⏳ Menghitung DTW & HDBSCAN (membutuhkan waktu)..."):
-        pivot_df = run_clustering(df, MIN_CLUSTER_SIZE, MIN_SAMPLES, EPSILON)
-    st.session_state['pivot_df'] = pivot_df
-    st.success("✅ Clustering selesai! Hasil divisualisasikan di bawah.")
-
-# Display Results
-if 'pivot_df' in st.session_state:
-    pivot_df = st.session_state['pivot_df']
-    df_fenologi, cluster_ts, valid_statuses = calculate_metrics(df, pivot_df)
-
-    if not df_fenologi.empty:
-        st.subheader(f"📊 Ringkasan Metrik Fenologi ({TARGET_YEAR})")
-        st.dataframe(df_fenologi.style.format({
-            'Puncak NDVI': '{:.2f}', 'Min NDVI': '{:.2f}', 'Amplitudo': '{:.2f}',
-            'Rata-rata NDVI': '{:.2f}', 'Rata-rata StdDev': '{:.2f}', 'Jml Titik': '{:,.0f}'
-        }).background_gradient(cmap='YlGn', subset=['Puncak NDVI', 'Amplitudo']))
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.pyplot(plot_comparison(cluster_ts, valid_statuses, TARGET_YEAR))
-        with col2:
-            st.pyplot(plot_individual_clusters(cluster_ts, valid_statuses))
+    if run_btn:
+        with st.spinner("Memproses Data..."):
+            # Analisis
+            ids, ts_data = preprocess_ts(df_filtered)
+            labels = run_clustering(ts_data, min_cluster_size=min_c)
             
-        st.pyplot(plot_spatial_map(df, nr, nc, valid_statuses))
-    else:
-        st.warning("⚠️ Tidak ada cluster valid yang terbentuk. Coba turunkan `Min Cluster Size` atau sesuaikan `Epsilon`.")
+            # Gabungkan Hasil
+            res = pd.DataFrame({'id_lokasi': ids, 'cluster_id': labels})
+            df_res = df_filtered.merge(res, on='id_lokasi', how='left')
+            df_res['status'] = df_res['cluster_id'].apply(lambda x: f"Cluster {int(x)}" if x >= 0 else ("Noise" if x == -1 else "Unselected"))
+            
+            # Visualisasi di Kolom 2
+            with col2:
+                st.subheader("📊 Hasil Analisis")
+                # (Logika plotting dan metrik fenologi diletakkan di sini)
+                st.plotly_chart(plot_interactive_trends(df_res), use_container_width=True)
+                st.success("Analisis Selesai!")
 else:
-    st.info("💡 Klik tombol **Jalankan Clustering** di sidebar untuk memulai analisis.")
+    st.info("Silakan unggah data CSV untuk memulai.")
