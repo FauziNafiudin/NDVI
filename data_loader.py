@@ -47,11 +47,14 @@ def load_and_preprocess_data(file_2023, file_2024, window_size=31, poly_order=2)
         else:
             daily['NDVI_smooth'] = daily['NDVI'].astype('float32')
 
+        # ✅ FIX: Eksplisit menambahkan semua kolom metadata ke `daily` sebelum di-select
         daily['id_lokasi'] = loc
         daily['lat_y'] = group['lat_y'].iloc[0]
         daily['lon_x'] = group['lon_x'].iloc[0]
+        daily['tahun'] = group['tahun'].iloc[0]
         daily['grid_row'] = group['grid_row'].iloc[0]
         daily['grid_col'] = group['grid_col'].iloc[0]
+        
         results.append(daily[['id_lokasi', 'tanggal', 'NDVI', 'NDVI_smooth', 'lat_y', 'lon_x', 'tahun', 'grid_row', 'grid_col']])
 
     df_final = pd.concat(results, ignore_index=True)
