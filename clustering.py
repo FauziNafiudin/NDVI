@@ -1,31 +1,26 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
+from scipy.signal import savgol_filter
 from tslearn.metrics import cdist_dtw
 import hdbscan
-import streamlit as st
 
-@st.cache_resource
-def run_clustering(df_year, min_cluster_size=3, min_samples=2, cluster_selection_epsilon=0.05):
-    pivot_df = df_year.pivot(index='id_lokasi', columns='tanggal', values='NDVI_smooth')
-    pivot_df = pivot_df.ffill(axis=1).bfill(axis=1)
+def preprocess_ts(df):
+    """Mengubah format data menjadi matriks time series dan melakukan smoothing."""
+    # Pivot data: baris adalah lokasi, kolom adalah tanggal
+    ts_pivot = df.pivot(index='id_lokasi', columns='tanggal', values='NDVI_smooth').dropna()
     
-    data_3d = pivot_df.values[:, :, np.newaxis].astype(np.float32)
-    
-    progress_bar = st.progress(0, text="🔄 Menghitung Matriks DTW...")
-    dist_matrix = cdist_dtw(data_3d, n_jobs=-1, verbose=0)
-    progress_bar.progress(0.5, text="🔄 Menjalankan HDBSCAN...")
+    # Smoothing menggunakan Savitzky-Golay
+    ts_smooth = savgol_filter(ts_pivot.values, window_length=5, polyorder=2)
+    return ts_pivot.index, ts_smooth
 
+def run_clustering(ts_data, min_cluster_size=5):
+    """Menjalankan clustering HDBSCAN dengan metrik jarak DTW."""
+    # Kalkulasi matriks jarak menggunakan Dynamic Time Warping
+    distance_matrix = cdist_dtw(ts_data)
+    
     clusterer = hdbscan.HDBSCAN(
-        metric='precomputed',
         min_cluster_size=min_cluster_size,
-        min_samples=min_samples,
-        cluster_selection_epsilon=cluster_selection_epsilon,
-        gen_min_span_tree=True,
-        prediction_data=True
+        metric='precomputed'
     )
-    labels = clusterer.fit_predict(dist_matrix.astype(np.float64))
-    progress_bar.progress(1.0, text="✅ Clustering Selesai!")
-    progress_bar.empty()
-
-    pivot_df['cluster'] = labels
-    return pivot_df
+    cluster_labels = clusterer.fit_predict(distance_matrix)
+    return cluster_labels
