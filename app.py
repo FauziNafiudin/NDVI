@@ -27,13 +27,13 @@ from visualization import (
 # ─────────────────────────────────────────────
 st.set_page_config(page_title="Fenologi Padi", page_icon="🌾", layout="wide",
                    initial_sidebar_state="collapsed")
-
 if 'selected_ids' in st.query_params:
     try:
         ids = json.loads(st.query_params['selected_ids'])
         if isinstance(ids, list) and len(ids) > 0:
             st.session_state["sampled_ids"] = ids
-            st.query_params.clear()   # bersihkan supaya tidak berulang
+            # hapus query params agar tidak reload terus
+            st.query_params.clear()
             st.rerun()
     except Exception:
         pass
@@ -414,9 +414,9 @@ document.getElementById('btn-confirm').addEventListener('click', () => {{
     return;
   }}
   // Kirim query params ke Streamlit
-  const url = new URL(window.parent.location);
+  const url = new URL(window.top.location);
   url.searchParams.set('selected_ids', JSON.stringify(ids));
-  window.parent.location.href = url.toString();
+  window.top.location.href = url.toString();
 }});
 </script>
 
