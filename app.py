@@ -3,7 +3,6 @@
 Alur vertikal top-to-bottom. Sampling via canvas paint interaktif.
 """
 import json
-import random
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -20,11 +19,11 @@ from visualization import (
     plot_spatial_map,
 )
 
-─────────────────────────────────────────────
-PAGE CONFIG & CSS
-─────────────────────────────────────────────
-st.set_page_config(page_title="Fenologi Padi", page_icon="🌾", layout="wide",
-                   initial_sidebar_state="collapsed")
+# ==========================================
+# PAGE CONFIG & CSS
+# ==========================================
+st.set_page_config(page_title="Fenologi Padi", page_icon="🌾", layout="wide", initial_sidebar_state="collapsed")
+
 st.markdown("""
 <style>
 .step-card { border: 1.5px solid #dcedc8; border-left: 5px solid #388e3c; border-radius: 10px; padding: 1.4rem 1.8rem 1rem; margin-bottom: 0.5rem; background: #f9fff9; }
@@ -35,6 +34,7 @@ st.markdown("""
 footer { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
+
 st.markdown("""
 <div style="background:linear-gradient(135deg,#1b5e20,#388e3c,#1b5e20); padding:1.8rem 2.5rem; border-radius:12px; margin-bottom:2rem; color:white;">
  <h1 style="margin:0;font-size:1.9rem;">🌾 Analisis Fenologi Padi</h1>
@@ -42,9 +42,9 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-═══════════════════════════════════════════════════════
-STEP 1 — LOAD DATA
-═══════════════════════════════════════════════════════
+# ==========================================
+# STEP 1 — LOAD DATA
+# ==========================================
 st.markdown('<div class="step-card"><h3>📁 Step 1 — Load Data</h3>', unsafe_allow_html=True)
 if "df_raw" not in st.session_state:
     if st.button("⬇️ Muat Data", type="primary", use_container_width=True):
@@ -73,13 +73,13 @@ st.markdown('</div>', unsafe_allow_html=True)
 if "df_raw" not in st.session_state:
     st.stop()
 
-═══════════════════════════════════════════════════════
-STEP 2 — PILIH TAHUN
-═══════════════════════════════════════════════════════
+# ==========================================
+# STEP 2 — PILIH TAHUN
+# ==========================================
 st.markdown('<hr class="step-divider">', unsafe_allow_html=True)
 st.markdown('<div class="step-card"><h3>📅 Step 2 — Pilih Tahun Analisis</h3>', unsafe_allow_html=True)
 
-# 🆕 Peta Grid Seluruh Lokasi MUNCUL DI SINI (Sebelum Pilih Tahun)
+# 🗺️ Peta Grid Seluruh Lokasi MUNCUL DI SINI (Sebelum Pilih Tahun)
 with st.expander("🗺️ Peta Grid Seluruh Lokasi (Semua Tahun)", expanded=False):
     st.pyplot(plot_grid_preview(df_raw, nr, nc))
 
@@ -104,18 +104,18 @@ if "tahun" not in st.session_state:
 tahun = st.session_state["tahun"]
 df_raw_year = df_raw[df_raw["tahun"] == tahun].copy()
 
-═══════════════════════════════════════════════════════
-STEP 3 — PREPROCESSING (Savitzky-Golay)
-═══════════════════════════════════════════════════════
+# ==========================================
+# STEP 3 — PREPROCESSING
+# ==========================================
 st.markdown('<hr class="step-divider">', unsafe_allow_html=True)
 st.markdown('<div class="step-card"><h3>⚙️ Step 3 — Preprocessing (Savitzky-Golay)</h3>', unsafe_allow_html=True)
 c1, c2 = st.columns(2)
 window_size = c1.slider("Window Size", 5, 61, 31, 2, help="Harus ganjil")
 poly_order  = c2.slider("Polynomial Order", 1, 5, 2)
+
 if st.button("▶ Jalankan Smoothing", type="primary", use_container_width=True):
     bar = st.progress(0)
-    df_smooth = apply_smoothing(df_raw_year, window_size, poly_order,
-                                progress_callback=lambda p, t: bar.progress(p, text=t))
+    df_smooth = apply_smoothing(df_raw_year, window_size, poly_order, progress_callback=lambda p, t: bar.progress(p, text=t))
     bar.empty()
     st.session_state["df_smooth"] = df_smooth
     st.session_state["df_year"]   = df_smooth[df_smooth["tahun"] == tahun].copy()
@@ -127,7 +127,6 @@ if "df_smooth" in st.session_state:
     df_year = st.session_state["df_year"]
     n_ts = df_year["tanggal"].nunique()
     st.markdown(f'<span class="badge-ok">✅ {df_year["id_lokasi"].nunique():,} lokasi × {n_ts} hari</span>', unsafe_allow_html=True)
-    # (Expander grid preview sudah dipindah ke Step 2, dihapus dari sini)
     st.markdown('</div>', unsafe_allow_html=True)
 else:
     st.markdown('</div>', unsafe_allow_html=True)
@@ -136,36 +135,29 @@ if "df_smooth" not in st.session_state:
     st.info("👆 Klik Jalankan Smoothing untuk melanjutkan.")
     st.stop()
 
-═══════════════════════════════════════════════════════
-STEP 4 — SAMPLING (Canvas Paint Interaktif)
-═══════════════════════════════════════════════════════
+# ==========================================
+# STEP 4 — SAMPLING (Canvas Paint Interaktif)
+# ==========================================
 st.markdown('<hr class="step-divider">', unsafe_allow_html=True)
 st.markdown('<div class="step-card"><h3>🎯 Step 4 — Sampling Data (Paint Mode)</h3>', unsafe_allow_html=True)
 st.caption("Klik-drag untuk memilih lokasi. Klik kanan untuk deselect. Atau gunakan Random.")
 
 df_year = st.session_state["df_year"]
-id_to_pos = (df_year[['id_lokasi', 'grid_row', 'grid_col']].drop_duplicates('id_lokasi').copy())
+id_to_pos = df_year[['id_lokasi', 'grid_row', 'grid_col']].drop_duplicates('id_lokasi').copy()
 grid_cells = [{"r": int(row.grid_row), "c": int(row.grid_col), "id": row.id_lokasi} for row in id_to_pos.itertuples()]
 grid_json = json.dumps(grid_cells)
 nr_js, nc_js = int(nr), int(nc)
 init_selected = json.dumps(st.session_state.get("sampled_ids", []))
 
 CANVAS_HTML = f"""
-<!DOCTYPE html>
-<html><head><style>
-* {{ box-sizing: border-box; margin: 0; padding: 0; }}
-body {{ font-family: sans-serif; background: #f9fff9; padding: 8px; }}
-#toolbar {{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; padding: 8px 12px; background: #fff; border: 1px solid #c8e6c9; border-radius: 8px; }}
-#toolbar label {{ font-size: 13px; color: #333; }}
-#counter {{ font-weight: 700; color: #2e7d32; font-size: 14px; margin-left: auto; background: #e8f5e9; padding: 4px 12px; border-radius: 20px; }}
-button {{ padding: 5px 14px; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; font-weight: 600; }}
-#btn-random {{ background: #1976d2; color: #fff; }}
-#btn-clear  {{ background: #e53935; color: #fff; }}
-#btn-confirm {{ background: #388e3c; color: #fff; }}
-button:hover {{ opacity: 0.85; }}
-#canvas-wrap {{ overflow: auto; border: 1px solid #c8e6c9; border-radius: 8px; background: #fff; max-height: 560px; }}
-canvas {{ display: block; cursor: crosshair; }}
-#msg {{ margin-top: 6px; font-size: 12px; color: #555; min-height: 18px; }}
+<!DOCTYPE html><html><head><style>
+*{{box-sizing:border-box;margin:0;padding:0}} body{{font-family:sans-serif;background:#f9fff9;padding:8px}}
+#toolbar{{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;padding:8px 12px;background:#fff;border:1px solid #c8e6c9;border-radius:8px}}
+#toolbar label{{font-size:13px;color:#333}} #counter{{font-weight:700;color:#2e7d32;font-size:14px;margin-left:auto;background:#e8f5e9;padding:4px 12px;border-radius:20px}}
+button{{padding:5px 14px;border:none;border-radius:6px;font-size:13px;cursor:pointer;font-weight:600}}
+#btn-random{{background:#1976d2;color:#fff}} #btn-clear{{background:#e53935;color:#fff}} #btn-confirm{{background:#388e3c;color:#fff}}
+button:hover{{opacity:0.85}} #canvas-wrap{{overflow:auto;border:1px solid #c8e6c9;border-radius:8px;background:#fff;max-height:560px}}
+canvas{{display:block;cursor:crosshair}} #msg{{margin-top:6px;font-size:12px;color:#555;min-height:18px}}
 </style></head><body>
 <div id="toolbar">
  <label>Brush Size: <input id="brush" type="range" min="1" max="12" value="3" style="width:90px;vertical-align:middle;"><span id="brush-val">3</span></label>
@@ -176,11 +168,11 @@ canvas {{ display: block; cursor: crosshair; }}
 <div id="canvas-wrap"><canvas id="c"></canvas></div>
 <div id="msg">💡 Klik kiri drag = pilih &nbsp;| &nbsp; Klik kanan drag = hapus pilihan</div>
 <script>
-const NR = {nr_js}, NC = {nc_js}, GRID_CELLS = {grid_json}, INIT_SELECTED = {init_selected};
+const NR={nr_js}, NC={nc_js}, GRID_CELLS={grid_json}, INIT_SELECTED={init_selected};
 const C_EMPTY='#D3D3D3', C_AVAIL='#4CAF50', C_SELECTED='#FF5722';
-const available = new Uint8Array(NR*NC), selected = new Uint8Array(NR*NC), cellId = new Array(NR*NC).fill(null);
+const available=new Uint8Array(NR*NC), selected=new Uint8Array(NR*NC), cellId=new Array(NR*NC).fill(null);
 GRID_CELLS.forEach(d=>{{available[d.r*NC+d.c]=1;cellId[d.r*NC+d.c]=d.id;}});
-const initSet = new Set(INIT_SELECTED); GRID_CELLS.forEach(d=>{{if(initSet.has(d.id))selected[d.r*NC+d.c]=1;}});
+const initSet=new Set(INIT_SELECTED); GRID_CELLS.forEach(d=>{{if(initSet.has(d.id))selected[d.r*NC+d.c]=1;}});
 const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
 const WRAP_W=Math.min(window.innerWidth-40,900), CELL=Math.max(3,Math.floor(Math.min(WRAP_W/NC,560/NR)));
 canvas.width=NC*CELL; canvas.height=NR*CELL;
@@ -255,9 +247,9 @@ if "sampled_ids" not in st.session_state:
     st.info("👆 Pilih lokasi di canvas lalu klik Confirm Seleksi dan Konfirmasi & Lanjut.")
     st.stop()
 
-═══════════════════════════════════════════════════════
-STEP 5 — DESKRIPSI & DTW
-═══════════════════════════════════════════════════════
+# ==========================================
+# STEP 5 — DESKRIPSI & DTW
+# ==========================================
 st.markdown('<hr class="step-divider">', unsafe_allow_html=True)
 st.markdown('<div class="step-card"><h3>📊 Step 5 — Ringkasan Data & Hitung DTW</h3>', unsafe_allow_html=True)
 sampled_ids = st.session_state["sampled_ids"]
@@ -270,9 +262,9 @@ with st.expander("Lihat sampel data (5 baris)"):
     st.dataframe(df_sampled[['id_lokasi', 'tanggal', 'NDVI', 'NDVI_smooth', 'lat_y', 'lon_x']].head(5), use_container_width=True)
 st.markdown('</div>', unsafe_allow_html=True)
 
-═══════════════════════════════════════════════════════
-STEP 6 — CLUSTERING HDBSCAN
-═══════════════════════════════════════════════════════
+# ==========================================
+# STEP 6 — CLUSTERING HDBSCAN
+# ==========================================
 st.markdown('<hr class="step-divider">', unsafe_allow_html=True)
 st.markdown('<div class="step-card"><h3>🔍 Step 6 — Clustering HDBSCAN</h3>', unsafe_allow_html=True)
 c1, c2, c3 = st.columns(3)
@@ -282,8 +274,7 @@ epsilon          = c3.slider("Epsilon",           0.0, 0.5, 0.05, 0.01)
 
 if st.button("🚀 Jalankan DTW + HDBSCAN", type="primary", use_container_width=True):
     bar = st.progress(0)
-    pivot_df = run_clustering(df_sampled, min_cluster_size, min_samples, epsilon,
-                              progress_callback=lambda p, t: bar.progress(p, text=t))
+    pivot_df = run_clustering(df_sampled, min_cluster_size, min_samples, epsilon, progress_callback=lambda p, t: bar.progress(p, text=t))
     bar.empty()
     st.session_state["pivot_df"] = pivot_df
     n_cls   = len(set(pivot_df['cluster'])) - (1 if -1 in pivot_df['cluster'].values else 0)
@@ -302,9 +293,9 @@ if "pivot_df" not in st.session_state:
     st.info("👆 Klik Jalankan DTW + HDBSCAN untuk memulai.")
     st.stop()
 
-═══════════════════════════════════════════════════════
-STEP 7 — HASIL AKHIR
-═══════════════════════════════════════════════════════
+# ==========================================
+# STEP 7 — HASIL AKHIR
+# ==========================================
 st.markdown('<hr class="step-divider">', unsafe_allow_html=True)
 st.markdown('<div class="step-card"><h3>📈 Step 7 — Hasil Akhir</h3>', unsafe_allow_html=True)
 pivot_df = st.session_state["pivot_df"]
