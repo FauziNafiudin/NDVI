@@ -269,15 +269,6 @@ const available = new Uint8Array(NR * NC);   // 1 = ada lokasi
 const selected  = new Uint8Array(NR * NC);   // 1 = terpilih
 const cellId    = new Array(NR * NC).fill(null); // id_lokasi per sel
 
-// Zoom handler
-const zoomSlider = document.getElementById('zoom-range');
-const zoomVal = document.getElementById('zoom-val');
-zoomSlider.addEventListener('input', () => {
-    const z = zoomSlider.value / 100;
-    zoomVal.textContent = zoomSlider.value + '%';
-    canvas.style.transform = `scale(${z})`;
-});
-
 GRID_CELLS.forEach(d => {{
   const idx = d.r * NC + d.c;
   available[idx] = 1;
@@ -315,6 +306,15 @@ function draw() {{
 }}
 
 draw();
+
+// Zoom
+const zoomSlider = document.getElementById('zoom-range');
+const zoomVal = document.getElementById('zoom-val');
+zoomSlider.addEventListener('input', () => {{
+    const z = zoomSlider.value / 100;
+    zoomVal.textContent = zoomSlider.value + '%';
+    canvas.style.transform = 'scale(' + z + ')';
+}});
 
 // Brush
 const brushSlider = document.getElementById('brush');
