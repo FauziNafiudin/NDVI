@@ -41,8 +41,8 @@ st.markdown("""
   .badge-warn { display:inline-block; background:#fff8e1; color:#e65100;
                 border:1px solid #ffe082; border-radius:20px;
                 padding:.2rem .9rem; font-size:.85rem; font-weight:600; }
-  /* sembunyikan label hidden input bridge */
-  [data-testid="stTextInput"] label { display:none !important; }
+  /* sembunyikan bridge input sepenuhnya */
+  [data-testid="stTextInput"] { display:none !important; }
   footer { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
@@ -382,6 +382,7 @@ if raw_bridge and raw_bridge != st.session_state.get("_bridge_ids", ""):
             st.session_state["_bridge_ids"] = raw_bridge
             st.session_state.pop("pivot_df", None)
             st.session_state.pop("dist_matrix", None)
+            st.session_state.pop("show_sample_result", None)
             st.rerun()
     except json.JSONDecodeError:
         pass
@@ -394,14 +395,18 @@ if "sampled_ids" in st.session_state:
         unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
 
+    if st.button("▶ Proses Sampel", type="primary", use_container_width=True,
+                 key="btn_proses_sampel"):
+        st.session_state["show_sample_result"] = True
+        st.rerun()
+
+if st.session_state.get("show_sample_result") and "sampled_ids" in st.session_state:
+    sampled_ids = st.session_state["sampled_ids"]
     tab1, tab2 = st.tabs(["🗺️ Peta Sebaran Sampel", "📈 Preview Time Series"])
     with tab1:
         st.pyplot(plot_sample_grid(df_year, sampled_ids, nr, nc))
     with tab2:
         st.pyplot(plot_sample_ts_preview(df_year, sampled_ids, n=3))
-
-    if st.button("▶ Lanjut ke Step 5 — Hitung DTW", type="primary", use_container_width=True):
-        st.rerun()
 
 st.markdown('</div>', unsafe_allow_html=True)
 
