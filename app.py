@@ -251,10 +251,7 @@ CANVAS_HTML = f"""
   <span id="counter">Terseleksi: 0</span>
 </div>
 
-<div id="canvas-wrap"
-     style="display:flex; justify-content:center; align-items:center;
-            overflow:auto; border:1px solid #c8e6c9; border-radius:8px;
-            background:#fff; max-height:70vh;">
+<div id="canvas-wrap">
   <canvas id="c"></canvas>
 </div>
 <div id="msg">💡 Klik kiri drag = pilih &nbsp;|&nbsp; Klik kanan drag = hapus pilihan</div>
@@ -414,9 +411,9 @@ document.getElementById('btn-confirm').addEventListener('click', () => {{
     return;
   }}
   // Kirim query params ke Streamlit
-  const url = new URL(window.top.location);
+  const url = new URL(parent.location);
   url.searchParams.set('selected_ids', JSON.stringify(ids));
-  window.top.location.href = url.toString();
+  parent.location.href = url.toString();
 }});
 </script>
 
