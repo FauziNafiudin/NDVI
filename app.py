@@ -294,8 +294,8 @@ const ctx    = canvas.getContext('2d');
 // Hitung cell size agar muat di lebar layar
 // Gunakan lebar yang lebih besar, maksimal 1200px
 const WRAP_W = Math.min(window.innerWidth - 40, 1200);
-// Hitung CELL agar grid memenuhi tinggi 600px atau lebar penuh
-const CELL   = Math.max(4, Math.floor(Math.min(WRAP_W / NC, 600 / NR)));
+// Hitung CELL agar grid memenuhi tinggi 550px atau lebar penuh
+const CELL   = Math.max(4, Math.floor(Math.min(WRAP_W / NC, 550 / NR)));
 canvas.width  = NC * CELL;
 canvas.height = NR * CELL;
 
