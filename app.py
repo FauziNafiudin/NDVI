@@ -171,7 +171,6 @@ if "df_smooth" not in st.session_state:
 st.markdown('<hr class="step-divider">', unsafe_allow_html=True)
 st.markdown('<div class="step-card"><h3>🎯 Step 4 — Sampling Data (Paint Mode)</h3>',
             unsafe_allow_html=True)
-st.caption("Klik‑drag = pilih lokasi (biru). Klik kanan drag = hapus. Atau pakai Random.")
 
 df_year = st.session_state["df_year"]
 
@@ -183,12 +182,6 @@ grid_cells    = [{"r": int(r.grid_row), "c": int(r.grid_col), "id": r.id_lokasi}
 grid_json     = json.dumps(grid_cells)
 nr_js, nc_js  = int(nr), int(nc)
 init_selected = json.dumps(st.session_state.get("sampled_ids", []))
-
-# ── Hidden text_input sebagai bridge JS → Python ─────────────
-# Streamlit merender input ini di DOM; JS akan inject value-nya
-# lalu trigger 'input' + 'change' event agar Streamlit mendeteksi perubahan.
-bridge_val = st.text_input("__bridge__", value="", key="canvas_bridge",
-                            label_visibility="collapsed")
 
 CANVAS_HTML = f"""
 <!DOCTYPE html><html>
@@ -208,10 +201,10 @@ CANVAS_HTML = f"""
   #btn-clear  {{background:#e53935;color:#fff;}}
   #btn-confirm{{background:#388e3c;color:#fff;}}
   button:hover{{opacity:.85;}}
-  #canvas-wrap{{overflow:auto;border:1px solid #c8e6c9;
-                border-radius:8px;background:#fff;}}
+  #canvas-outer{{display:flex;justify-content:center;margin-top:6px;}}
+  #canvas-wrap{{overflow:auto;border:1px solid #c8e6c9;border-radius:8px;background:#fff;display:inline-block;}}
   canvas{{display:block;cursor:crosshair;}}
-  #msg{{margin-top:5px;font-size:12px;color:#555;min-height:16px;}}
+  #msg{{margin-top:6px;font-size:12px;text-align:center;min-height:16px;color:#555;}}
 </style>
 </head>
 <body>
@@ -221,6 +214,7 @@ CANVAS_HTML = f"""
            style="width:80px;vertical-align:middle;">
     <span id="brush-val">3</span>
   </label>
+  <span style="font-size:11px;color:#888;margin-left:2px;">🖱 kiri=pilih · kanan=hapus</span>
   <label style="margin-left:4px;">Random:
     <input id="n-random" type="number" value="100" min="1"
            style="width:70px;padding:3px 5px;border:1px solid #ccc;border-radius:4px;">
@@ -231,8 +225,10 @@ CANVAS_HTML = f"""
   <span id="counter">Terseleksi: 0</span>
 </div>
 
-<div id="canvas-wrap"><canvas id="c"></canvas></div>
-<div id="msg">💡 Kiri drag = pilih &nbsp;|&nbsp; Kanan drag = hapus</div>
+<div id="canvas-outer">
+  <div id="canvas-wrap"><canvas id="c"></canvas></div>
+</div>
+<div id="msg"></div>
 
 <script>
 const NR={nr_js}, NC={nc_js};
@@ -257,13 +253,12 @@ const canvas=document.getElementById('c');
 const ctx=canvas.getContext('2d');
 const WRAP=document.getElementById('canvas-wrap');
 
-// Hitung cell size agar pas lebar layar tanpa scroll horizontal
-// Target lebar sekitar 95vw tapi tidak lebih dari 1100px
-const targetW=Math.min(window.innerWidth*0.95, 1100);
-const CELL=Math.max(3, Math.floor(Math.min(targetW/NC, (window.innerHeight*0.62)/NR)));
-canvas.width =NC*CELL;
-canvas.height=NR*CELL;
-WRAP.style.maxHeight=(NR*CELL+4)+'px';
+// Canvas mengisi ~82% lebar layar, proporsional tinggi
+const availW = Math.min(window.innerWidth * 0.82, 1200);
+const availH = window.innerHeight * 0.72;
+const CELL = Math.max(4, Math.floor(Math.min(availW / NC, availH / NR)));
+canvas.width  = NC * CELL;
+canvas.height = NR * CELL;
 
 function draw(){{
   for(let r=0;r<NR;r++){{
@@ -348,15 +343,12 @@ document.getElementById('btn-confirm').addEventListener('click',()=>{{
   const msg=document.getElementById('msg');
   if(!ids.length){{ msg.textContent='⚠️ Belum ada lokasi dipilih!'; msg.style.color='#e53935'; return; }}
 
-  // Cari input Streamlit dengan key "canvas_bridge" di parent frame
   const payload=JSON.stringify(ids);
   const inputs=window.parent.document.querySelectorAll('input[type=text]');
   let found=false;
   inputs.forEach(inp=>{{
-    // Streamlit menyimpan key di aria-label atau data-testid pada wrapper
     const wrapper=inp.closest('[data-testid="stTextInput"]');
-    if(wrapper){{
-      // Inject value dan trigger React synthetic event
+    if(wrapper && !found){{
       const nativeInputValueSetter=Object.getOwnPropertyDescriptor(window.parent.HTMLInputElement.prototype,'value').set;
       nativeInputValueSetter.call(inp, payload);
       inp.dispatchEvent(new Event('input',{{bubbles:true}}));
@@ -365,17 +357,21 @@ document.getElementById('btn-confirm').addEventListener('click',()=>{{
   }});
 
   msg.textContent = found
-    ? '✅ '+ids.length+' lokasi dikonfirmasi — memuat hasil...'
-    : '⚠️ Tidak bisa menemukan input bridge. Coba refresh.';
+    ? '✅ '+ids.length+' lokasi dikonfirmasi — scroll ke bawah untuk lanjut.'
+    : '⚠️ Bridge tidak ditemukan. Coba refresh halaman.';
   msg.style.color = found ? '#2e7d32' : '#e53935';
 }});
 </script>
 </body></html>
 """
 
-components.html(CANVAS_HTML, height=620, scrolling=False)
+components.html(CANVAS_HTML, height=680, scrolling=False)
 
-# ── Baca nilai bridge ─────────────────────────────────────────
+# ── Bridge input: letaknya DI BAWAH canvas, disembunyikan via CSS ────
+bridge_val = st.text_input("__bridge__", value="", key="canvas_bridge",
+                            label_visibility="collapsed")
+
+# ── Proses nilai bridge ketika berubah ───────────────────────
 raw_bridge = st.session_state.get("canvas_bridge", "").strip()
 
 if raw_bridge and raw_bridge != st.session_state.get("_bridge_ids", ""):
@@ -385,6 +381,7 @@ if raw_bridge and raw_bridge != st.session_state.get("_bridge_ids", ""):
             st.session_state["sampled_ids"] = ids_list
             st.session_state["_bridge_ids"] = raw_bridge
             st.session_state.pop("pivot_df", None)
+            st.session_state.pop("dist_matrix", None)
             st.rerun()
     except json.JSONDecodeError:
         pass
@@ -395,12 +392,16 @@ if "sampled_ids" in st.session_state:
     st.markdown(
         f'<span class="badge-ok">✅ {len(sampled_ids):,} lokasi terkonfirmasi</span>',
         unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
 
     tab1, tab2 = st.tabs(["🗺️ Peta Sebaran Sampel", "📈 Preview Time Series"])
     with tab1:
         st.pyplot(plot_sample_grid(df_year, sampled_ids, nr, nc))
     with tab2:
         st.pyplot(plot_sample_ts_preview(df_year, sampled_ids, n=3))
+
+    if st.button("▶ Lanjut ke Step 5 — Hitung DTW", type="primary", use_container_width=True):
+        st.rerun()
 
 st.markdown('</div>', unsafe_allow_html=True)
 
