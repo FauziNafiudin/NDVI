@@ -36,9 +36,9 @@ def get_valid_statuses(df):
     )
 
 
-# ── STEP 3: GRID PREVIEW (setelah smoothing) ─────────────────
+# ── STEP 1: GRID PREVIEW (semua data, sebelum pilih tahun) ───
 
-def plot_grid_preview(df, nr, nc):
+def plot_grid_preview(df, nr, nc, title='Sebaran Lokasi — Seluruh Data'):
     """Peta seluruh lokasi yang punya data (hijau) vs kosong (abu)."""
     grid = np.zeros((nr, nc), dtype=int)
     for _, row in df[['grid_row', 'grid_col']].drop_duplicates().iterrows():
@@ -50,7 +50,7 @@ def plot_grid_preview(df, nr, nc):
                   edgecolors='white', linewidth=0.4, shading='auto')
     ax.invert_yaxis()
     ax.set_aspect('equal')
-    ax.set_title('Sebaran Lokasi — Seluruh Data', fontweight='bold', fontsize=13)
+    ax.set_title(title, fontweight='bold', fontsize=13)
     ax.legend(handles=[
         Patch(facecolor='#4CAF50', edgecolor='white', label='Ada Data'),
         Patch(facecolor='#D3D3D3', edgecolor='white', label='Kosong'),
@@ -59,24 +59,57 @@ def plot_grid_preview(df, nr, nc):
     return fig
 
 
+# ── STEP 3: SMOOTHING PREVIEW ────────────────────────────────
+
+def plot_smoothing_preview(df_smooth, n=3):
+    """
+    Perbandingan NDVI asli (abu transparan) vs NDVI smooth (biru solid)
+    untuk n lokasi acak — ditampilkan setelah smoothing selesai.
+    """
+    locs = df_smooth['id_lokasi'].unique()
+    preview = random.sample(list(locs), k=min(n, len(locs)))
+    fig, axes = plt.subplots(1, len(preview), figsize=(5 * len(preview), 4), sharey=True)
+    if len(preview) == 1:
+        axes = [axes]
+    for ax, loc in zip(axes, preview):
+        sub = df_smooth[df_smooth['id_lokasi'] == loc].sort_values('tanggal')
+        ax.plot(sub['tanggal'], sub['NDVI'],        color='#888888', alpha=0.35,
+                linewidth=1.2, label='NDVI Asli')
+        ax.plot(sub['tanggal'], sub['NDVI_smooth'], color='#1565C0',
+                linewidth=2.2, label='Smoothed')
+        ax.set_title(loc, fontsize=9, fontweight='bold')
+        ax.grid(True, alpha=0.3, linestyle='--')
+        ax.tick_params(axis='x', rotation=30, labelsize=7)
+    axes[0].set_ylabel('NDVI')
+    axes[0].legend(loc='upper right', fontsize=7)
+    plt.suptitle('NDVI Asli vs Savitzky‑Golay Smooth', fontweight='bold', y=1.02)
+    plt.tight_layout()
+    return fig
+
+
 # ── STEP 4: SAMPLE GRID (hasil konfirmasi canvas) ────────────
 
 def plot_sample_grid(df_year, sampled_ids, nr, nc):
-    """Peta dengan highlight lokasi yang disampling (biru) & latar hijau transparan."""
+    """
+    Peta sebaran sampel — bentuk grid sama persis dengan plot_grid_preview.
+    Warna:
+      0 = kosong        → abu (#D3D3D3)
+      1 = tidak dipilih → hijau transparan (alpha rendah)
+      2 = tersampling   → biru (#2196F3)
+    """
     sampled_set = set(sampled_ids)
     id_to_pos = df_year[['id_lokasi', 'grid_row', 'grid_col']].drop_duplicates('id_lokasi')
 
-    # Grid dengan nilai: 0 = kosong, 1 = tidak tersampling, 2 = tersampling
     grid = np.zeros((nr, nc), dtype=int)
     for _, row in id_to_pos.iterrows():
-        grid[int(row['grid_row']), int(row['grid_col'])] = 2 if row['id_lokasi'] in sampled_set else 1
+        grid[int(row['grid_row']), int(row['grid_col'])] = \
+            2 if row['id_lokasi'] in sampled_set else 1
 
-    # Warna dengan alpha untuk latar hijau transparan
-    color_empty    = '#D3D3D3'           # abu‑abu
-    color_unsel    = (0.3, 0.8, 0.3, 0.4)  # hijau semi‑transparan
-    color_sampled  = '#2196F3'           # biru
+    # RGBA untuk hijau sangat transparan
+    color_unsel = (0.30, 0.75, 0.30, 0.25)   # hijau pudar
+    color_samp  = '#2196F3'                    # biru solid
 
-    cmap = ListedColormap([color_empty, color_unsel, color_sampled])
+    cmap = ListedColormap(['#D3D3D3', color_unsel, color_samp])
 
     fig, ax = plt.subplots(figsize=(9, 7))
     ax.pcolormesh(np.arange(nc + 1), np.arange(nr + 1), grid,
@@ -84,21 +117,19 @@ def plot_sample_grid(df_year, sampled_ids, nr, nc):
                   edgecolors='white', linewidth=0.3, shading='auto')
     ax.invert_yaxis()
     ax.set_aspect('equal')
-    ax.set_title(f'Lokasi Tersampling: {len(sampled_ids):,}', fontweight='bold', fontsize=13)
-
-    legend_handles = [
-        Patch(facecolor=color_sampled, edgecolor='white', label=f'Tersampling ({len(sampled_ids):,})'),
-        Patch(facecolor=color_unsel,   edgecolor='white', label='Tidak Tersampling'),
-        Patch(facecolor=color_empty,   edgecolor='white', label='Kosong'),
-    ]
-    ax.legend(handles=legend_handles, loc='upper right')
+    ax.set_title(f'Sebaran Sampel — {len(sampled_ids):,} Lokasi Terpilih',
+                 fontweight='bold', fontsize=13)
+    ax.legend(handles=[
+        Patch(facecolor=color_samp,   edgecolor='white', label=f'Tersampling ({len(sampled_ids):,})'),
+        Patch(facecolor=color_unsel,  edgecolor='white', label='Tidak Tersampling'),
+        Patch(facecolor='#D3D3D3',    edgecolor='white', label='Kosong'),
+    ], loc='upper right')
     plt.tight_layout()
     return fig
 
 
 def plot_sample_ts_preview(df_year, sampled_ids, n=3):
     """Time series NDVI_smooth untuk n lokasi sampel acak."""
-    import random
     preview = random.sample(list(sampled_ids), k=min(n, len(sampled_ids)))
     fig, axes = plt.subplots(1, len(preview), figsize=(5 * len(preview), 4), sharey=True)
     if len(preview) == 1:
@@ -196,51 +227,64 @@ def plot_individual_clusters(cluster_ts, valid_statuses):
     return fig
 
 
-def plot_spatial_map(df, nr, nc, valid_statuses):
-    NOISE_COLOR = '#E74C3C'
-    UNSEL_COLOR = '#D3D3D3'
+def plot_spatial_map(df, nr, nc, valid_statuses, sampled_ids=None):
+    """
+    Peta akhir cluster:
+      - Tidak tersampling (semua lokasi di luar pivot_df) → hijau pudar
+      - Noise (cluster = -1)  → merah
+      - Setiap cluster         → warna tab10
+      - Kosong (tidak ada data)→ abu
+    sampled_ids dipakai untuk membedakan 'tidak tersampling' vs 'kosong'.
+    """
+    NOISE_COLOR  = '#E74C3C'
+    EMPTY_COLOR  = '#D3D3D3'
+    UNSEL_COLOR  = (0.30, 0.75, 0.30, 0.30)   # hijau sangat transparan
+
     palette = sns.color_palette('tab10', len(valid_statuses))
-    status_int = {'Noise': 1}
+
+    # integer map: 0=kosong, 1=unselected, 2=noise, 3+=cluster
+    status_int = {'Unselected': 1, 'Noise': 2}
     for i, s in enumerate(valid_statuses):
-        status_int[s] = i + 2
+        status_int[s] = i + 3
 
-    grid = np.full((nr, nc), 0)
-    gmap = df[['grid_row', 'grid_col', 'status']].drop_duplicates()
-    for _, row in gmap.iterrows():
-        grid[int(row['grid_row']), int(row['grid_col'])] = status_int.get(row['status'], 0)
+    # Tandai dulu semua sel yang ada lokasi sebagai 'Unselected'
+    grid = np.zeros((nr, nc), dtype=int)
+    all_pos = df[['grid_row', 'grid_col', 'status']].drop_duplicates()
 
-    all_colors = [UNSEL_COLOR, NOISE_COLOR] + [mpl.colors.rgb2hex(c) for c in palette[:len(valid_statuses)]]
+    # Kalau sampled_ids diberikan, sel yang tidak masuk sampling tetap 0 (kosong visual)
+    # vs sel yang disampling tapi noise/cluster
+    sampled_set = set(sampled_ids) if sampled_ids is not None else None
+
+    for _, row in all_pos.iterrows():
+        r, c, st = int(row['grid_row']), int(row['grid_col']), row['status']
+        val = status_int.get(st, 0)
+        # Unselected = ada data tapi tidak masuk sampling → hijau pudar
+        # Kosong     = tidak ada data sama sekali         → abu (0, default)
+        grid[r, c] = val
+
+    # Build colormap: [empty, unsel, noise, cluster0, cluster1, ...]
+    n_total = 3 + len(valid_statuses)
+    rgba_colors = (
+        [EMPTY_COLOR, UNSEL_COLOR, NOISE_COLOR] +
+        [mpl.colors.rgb2hex(palette[i]) for i in range(len(valid_statuses))]
+    )
+    cmap = ListedColormap(rgba_colors)
+
     fig, ax = plt.subplots(figsize=(12, 9))
     ax.pcolormesh(np.arange(nc + 1), np.arange(nr + 1), grid,
-                  cmap=ListedColormap(all_colors), edgecolors='white', linewidth=0.3, shading='auto')
+                  cmap=cmap, vmin=0, vmax=n_total - 1,
+                  edgecolors='white', linewidth=0.3, shading='auto')
     ax.invert_yaxis()
     ax.set_aspect('equal')
     ax.set_title('Peta Sebaran Cluster', fontweight='bold', fontsize=14)
-    legend_els = [Patch(facecolor=NOISE_COLOR, edgecolor='white', label='Noise')] + \
-                 [Patch(facecolor=mpl.colors.rgb2hex(palette[i]), edgecolor='white', label=s)
-                  for i, s in enumerate(valid_statuses)]
-    ax.legend(handles=legend_els, title='Cluster', bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.subplots_adjust(right=0.75)
-    return fig
 
-def plot_smoothing_preview(df_smooth, n=3):
-    """Preview perbandingan NDVI asli vs NDVI smooth untuk n lokasi acak."""
-    locs = df_smooth['id_lokasi'].unique()
-    preview = random.sample(list(locs), k=min(n, len(locs)))
-    fig, axes = plt.subplots(1, len(preview), figsize=(5*len(preview), 4), sharey=True)
-    if len(preview) == 1:
-        axes = [axes]
-    for ax, loc in zip(axes, preview):
-        sub = df_smooth[df_smooth['id_lokasi'] == loc].sort_values('tanggal')
-        # NDVI asli dengan transparan
-        ax.plot(sub['tanggal'], sub['NDVI'], color='gray', alpha=0.4, linewidth=1.5, label='NDVI Asli')
-        # NDVI smooth solid
-        ax.plot(sub['tanggal'], sub['NDVI_smooth'], color='#1f77b4', linewidth=2, label='Smoothed')
-        ax.set_title(loc, fontsize=9, fontweight='bold')
-        ax.grid(True, alpha=0.3, linestyle='--')
-        ax.tick_params(axis='x', rotation=30, labelsize=7)
-    axes[0].set_ylabel('NDVI')
-    axes[0].legend(loc='upper right', fontsize=7)
-    plt.suptitle('Perbandingan NDVI Asli vs Smooth (Savitzky‑Golay)', fontweight='bold', y=1.02)
-    plt.tight_layout()
+    legend_els = (
+        [Patch(facecolor=UNSEL_COLOR,  edgecolor='white', label='Tidak Tersampling'),
+         Patch(facecolor=NOISE_COLOR,  edgecolor='white', label='Noise')] +
+        [Patch(facecolor=mpl.colors.rgb2hex(palette[i]), edgecolor='white', label=s)
+         for i, s in enumerate(valid_statuses)]
+    )
+    ax.legend(handles=legend_els, title='Keterangan',
+              bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.subplots_adjust(right=0.75)
     return fig
