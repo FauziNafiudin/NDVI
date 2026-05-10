@@ -231,6 +231,11 @@ CANVAS_HTML = f"""
            style="width:90px;vertical-align:middle;">
     <span id="brush-val">3</span>
   </label>
+  <label>Zoom:
+    <input id="zoom-range" type="range" min="50" max="200" value="100" step="5"
+           style="width:80px;vertical-align:middle;">
+    <span id="zoom-val">100%</span>
+  </label>
   <label style="margin-left:6px;">Random:
     <input id="n-random" type="number" value="100" min="1" style="width:70px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;">
   </label>
@@ -240,8 +245,11 @@ CANVAS_HTML = f"""
   <span id="counter">Terseleksi: 0</span>
 </div>
 
-<div id="canvas-wrap">
-  <canvas id="c"></canvas>
+<div id="canvas-wrap"
+     style="display:flex; justify-content:center; align-items:center;
+            overflow:auto; border:1px solid #c8e6c9; border-radius:8px;
+            background:#fff; max-height:70vh;">
+  <canvas id="c" style="transform-origin: top left; transition: transform 0.1s;"></canvas>
 </div>
 <div id="msg">💡 Klik kiri drag = pilih &nbsp;|&nbsp; Klik kanan drag = hapus pilihan</div>
 
@@ -260,6 +268,15 @@ const C_SELECTED = '#FF5722';
 const available = new Uint8Array(NR * NC);   // 1 = ada lokasi
 const selected  = new Uint8Array(NR * NC);   // 1 = terpilih
 const cellId    = new Array(NR * NC).fill(null); // id_lokasi per sel
+
+// Zoom handler
+const zoomSlider = document.getElementById('zoom-range');
+const zoomVal = document.getElementById('zoom-val');
+zoomSlider.addEventListener('input', () => {
+    const z = zoomSlider.value / 100;
+    zoomVal.textContent = zoomSlider.value + '%';
+    canvas.style.transform = `scale(${z})`;
+});
 
 GRID_CELLS.forEach(d => {{
   const idx = d.r * NC + d.c;
@@ -383,26 +400,25 @@ document.getElementById('btn-clear').addEventListener('click', () => {{
 }});
 
 // Confirm → kirim ke Streamlit
-document.getElementById('btn-confirm').addEventListener('click', () => {{
+document.getElementById('btn-confirm').addEventListener('click', () => {
   const ids = [];
-  for (let r = 0; r < NR; r++) {{
-    for (let c = 0; c < NC; c++) {{
+  for (let r = 0; r < NR; r++) {
+    for (let c = 0; c < NC; c++) {
       const idx = r * NC + c;
       if (selected[idx] && cellId[idx]) ids.push(cellId[idx]);
-    }}
-  }}
-  const msg = document.getElementById('msg');
-  if (ids.length === 0) {{
+    }
+  }
+  if (ids.length === 0) {
+    const msg = document.getElementById('msg');
     msg.textContent = '⚠️ Belum ada sel yang dipilih!';
     msg.style.color = '#e53935';
     return;
-  }}
-  msg.textContent = '✅ ' + ids.length + ' lokasi dikonfirmasi — copy JSON di bawah lalu klik Konfirmasi.';
-  msg.style.color = '#2e7d32';
-  // Tampilkan JSON di textarea tersembunyi di dalam iframe
-  document.getElementById('json-out').value = JSON.stringify(ids);
-  document.getElementById('json-wrap').style.display = 'block';
-}});
+  }
+  // Set query params di parent – halaman akan reload
+  const url = new URL(parent.location);
+  url.searchParams.set('selected_ids', JSON.stringify(ids));
+  parent.location.href = url.toString();
+});
 </script>
 
 <!-- Output JSON bridge -->
