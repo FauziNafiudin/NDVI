@@ -400,25 +400,25 @@ document.getElementById('btn-clear').addEventListener('click', () => {{
 }});
 
 // Confirm → kirim ke Streamlit
-document.getElementById('btn-confirm').addEventListener('click', () => {
+document.getElementById('btn-confirm').addEventListener('click', () => {{
   const ids = [];
-  for (let r = 0; r < NR; r++) {
-    for (let c = 0; c < NC; c++) {
+  for (let r = 0; r < NR; r++) {{
+    for (let c = 0; c < NC; c++) {{
       const idx = r * NC + c;
       if (selected[idx] && cellId[idx]) ids.push(cellId[idx]);
-    }
-  }
-  if (ids.length === 0) {
-    const msg = document.getElementById('msg');
+    }}
+  }}
+  const msg = document.getElementById('msg');
+  if (ids.length === 0) {{
     msg.textContent = '⚠️ Belum ada sel yang dipilih!';
     msg.style.color = '#e53935';
     return;
-  }
-  // Set query params di parent – halaman akan reload
+  }}
+  // Kirim query params ke Streamlit
   const url = new URL(parent.location);
   url.searchParams.set('selected_ids', JSON.stringify(ids));
   parent.location.href = url.toString();
-});
+}});
 </script>
 
 <!-- Output JSON bridge -->
