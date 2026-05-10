@@ -215,7 +215,7 @@ CANVAS_HTML = f"""
 
   #canvas-wrap {{
     overflow: auto; border: 1px solid #c8e6c9; border-radius: 8px;
-    background: #fff; max-height: 560px;
+    background: #fff;
   }}
   canvas {{ display: block; cursor: crosshair; }}
 
@@ -232,11 +232,6 @@ CANVAS_HTML = f"""
            style="width:90px;vertical-align:middle;">
     <span id="brush-val">3</span>
   </label>
-  <label>Zoom:
-    <input id="zoom-range" type="range" min="50" max="200" value="100" step="5"
-           style="width:80px;vertical-align:middle;">
-    <span id="zoom-val">100%</span>
-  </label>
   <label style="margin-left:6px;">Random:
     <input id="n-random" type="number" value="100" min="1" style="width:70px;padding:3px 6px;border:1px solid #ccc;border-radius:4px;">
   </label>
@@ -250,7 +245,7 @@ CANVAS_HTML = f"""
      style="display:flex; justify-content:center; align-items:center;
             overflow:auto; border:1px solid #c8e6c9; border-radius:8px;
             background:#fff; max-height:70vh;">
-  <canvas id="c" style="transform-origin: top left; transition: transform 0.1s;"></canvas>
+  <canvas id="c"></canvas>
 </div>
 <div id="msg">💡 Klik kiri drag = pilih &nbsp;|&nbsp; Klik kanan drag = hapus pilihan</div>
 
@@ -287,8 +282,10 @@ const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
 
 // Hitung cell size agar muat di lebar layar
-const WRAP_W = Math.min(window.innerWidth - 40, 900);
-const CELL   = Math.max(3, Math.floor(Math.min(WRAP_W / NC, 560 / NR)));
+// Gunakan lebar yang lebih besar, maksimal 1200px
+const WRAP_W = Math.min(window.innerWidth - 40, 1200);
+// Hitung CELL agar grid memenuhi tinggi 700px atau lebar penuh
+const CELL   = Math.max(4, Math.floor(Math.min(WRAP_W / NC, 700 / NR)));
 canvas.width  = NC * CELL;
 canvas.height = NR * CELL;
 
@@ -307,15 +304,6 @@ function draw() {{
 }}
 
 draw();
-
-// Zoom
-const zoomSlider = document.getElementById('zoom-range');
-const zoomVal = document.getElementById('zoom-val');
-zoomSlider.addEventListener('input', () => {{
-    const z = zoomSlider.value / 100;
-    zoomVal.textContent = zoomSlider.value + '%';
-    canvas.style.transform = 'scale(' + z + ')';
-}});
 
 // Brush
 const brushSlider = document.getElementById('brush');
