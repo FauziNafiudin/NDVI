@@ -254,12 +254,10 @@ GRID_CELLS.forEach(d=>{{
 const initSet=new Set(INIT_SEL);
 GRID_CELLS.forEach(d=>{{ if(initSet.has(d.id)) selected[d.r*NC+d.c]=1; }});
 
-// --- Canvas size: fit lebar parent frame ---
 const canvas=document.getElementById('c');
 const ctx=canvas.getContext('2d');
 const WRAP=document.getElementById('canvas-wrap');
 
-// Canvas mengisi ~82% lebar layar, proporsional tinggi
 const availW = Math.min(window.innerWidth * 0.82, 1200);
 const availH = window.innerHeight * 0.72;
 const CELL = Math.max(4, Math.floor(Math.min(availW / NC, availH / NR)));
@@ -279,7 +277,6 @@ function draw(){{
 }}
 draw();
 
-// Brush slider
 const brushSlider=document.getElementById('brush');
 document.getElementById('brush-val').textContent=brushSlider.value;
 brushSlider.addEventListener('input',()=>document.getElementById('brush-val').textContent=brushSlider.value);
@@ -309,7 +306,6 @@ canvas.addEventListener('mousemove',e=>{{
 window.addEventListener('mouseup',()=>{{dragging=false;}});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 
-// Touch
 canvas.addEventListener('touchstart',e=>{{
   e.preventDefault(); dragging=true; dragMode=1;
   const t=e.touches[0],rc=canvas.getBoundingClientRect();
@@ -322,7 +318,6 @@ canvas.addEventListener('touchmove',e=>{{
 }},{{passive:false}});
 canvas.addEventListener('touchend',()=>{{dragging=false;}});
 
-// Random
 document.getElementById('btn-random').addEventListener('click',()=>{{
   selected.fill(0);
   const avail=[]; GRID_CELLS.forEach(d=>avail.push(d.r*NC+d.c));
@@ -335,12 +330,11 @@ document.getElementById('btn-random').addEventListener('click',()=>{{
   draw();
 }});
 
-// Clear
 document.getElementById('btn-clear').addEventListener('click',()=>{{
   selected.fill(0); draw();
 }});
 
-// Konfirmasi → inject ke hidden Streamlit text_input lalu trigger rerun
+// Konfirmasi → inject ke Streamlit text input hidden dengan on_change
 document.getElementById('btn-confirm').addEventListener('click',()=>{{
   const ids=[];
   for(let r=0;r<NR;r++) for(let c=0;c<NC;c++){{
@@ -350,8 +344,7 @@ document.getElementById('btn-confirm').addEventListener('click',()=>{{
   if(!ids.length){{ msg.textContent='⚠️ Belum ada lokasi dipilih!'; msg.style.color='#e53935'; return; }}
 
   const payload=JSON.stringify(ids);
-  // Cari label dengan teks "lokasi_terpilih", ambil input di wrapper yang sama
-  let found=false;
+  // Inject ke input dengan key "canvas_bridge_internal"
   const labels=window.parent.document.querySelectorAll('label');
   labels.forEach(lbl=>{{
     if(lbl.textContent.trim()==='lokasi_terpilih'){{
@@ -362,16 +355,13 @@ document.getElementById('btn-confirm').addEventListener('click',()=>{{
           const setter=Object.getOwnPropertyDescriptor(window.parent.HTMLInputElement.prototype,'value').set;
           setter.call(inp, payload);
           inp.dispatchEvent(new Event('input',{{bubbles:true}}));
-          found=true;
         }}
       }}
     }}
   }});
 
-  msg.textContent = found
-    ? '✅ '+ids.length+' lokasi dikonfirmasi — scroll ke bawah untuk lanjut.'
-    : '⚠️ Bridge tidak ditemukan. Coba refresh halaman.';
-  msg.style.color = found ? '#2e7d32' : '#e53935';
+  msg.textContent='✅ '+ids.length+' lokasi dikonfirmasi – tunggu sebentar...';
+  msg.style.color='#2e7d32';
 }});
 </script>
 </body></html>
@@ -379,51 +369,46 @@ document.getElementById('btn-confirm').addEventListener('click',()=>{{
 
 components.html(CANVAS_HTML, height=680, scrolling=False)
 
-# ── Bridge input: letaknya DI BAWAH canvas, disembunyikan via CSS ────
-bridge_val = st.text_input("lokasi_terpilih", value="", key="canvas_bridge",
-                            placeholder="ID lokasi akan muncul di sini setelah konfirmasi...")
+# ── Callback untuk memproses hasil bridge secara otomatis ──
+def process_bridge():
+    raw = st.session_state.get("canvas_bridge_internal", "").strip()
+    if raw and raw != st.session_state.get("_bridge_prev", ""):
+        try:
+            ids_list = json.loads(raw)
+            if isinstance(ids_list, list) and len(ids_list) > 0:
+                st.session_state["sampled_ids"] = ids_list
+                st.session_state["_bridge_prev"] = raw        # hindari pemicu berulang
+                st.session_state["show_sample_result"] = True
+                st.session_state["canvas_bridge_internal"] = "" # reset agar siap untuk input baru
+        except json.JSONDecodeError:
+            pass
 
-# ── Proses nilai bridge ketika berubah ───────────────────────
-raw_bridge = st.session_state.get("canvas_bridge", "").strip()
+# Input tersembunyi yang akan diisi oleh JavaScript, dengan callback on_change
+st.text_input(
+    "lokasi_terpilih",
+    key="canvas_bridge_internal",
+    on_change=process_bridge,
+    label_visibility="collapsed"
+)
 
-if raw_bridge and raw_bridge != st.session_state.get("_bridge_ids", ""):
-    try:
-        ids_list = json.loads(raw_bridge)
-        if isinstance(ids_list, list) and len(ids_list) > 0:
-            st.session_state["sampled_ids"] = ids_list
-            st.session_state["_bridge_ids"] = raw_bridge
-            st.session_state.pop("pivot_df", None)
-            st.session_state.pop("dist_matrix", None)
-            st.session_state.pop("show_sample_result", None)
-            st.rerun()
-    except json.JSONDecodeError:
-        pass
-
-# ── Tampilkan hasil sampling jika sudah ada ───────────────────
-if "sampled_ids" in st.session_state:
+# ── Tampilkan hasil sampling jika sudah ada ────────────
+if st.session_state.get("show_sample_result") and "sampled_ids" in st.session_state:
     sampled_ids = st.session_state["sampled_ids"]
     st.markdown(
         f'<span class="badge-ok">✅ {len(sampled_ids):,} lokasi terkonfirmasi</span>',
         unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
-
-    if st.button("▶ Proses Sampel", type="primary", use_container_width=True,
-                 key="btn_proses_sampel"):
-        st.session_state["show_sample_result"] = True
-        st.rerun()
-
-if st.session_state.get("show_sample_result") and "sampled_ids" in st.session_state:
-    sampled_ids = st.session_state["sampled_ids"]
     tab1, tab2 = st.tabs(["🗺️ Peta Sebaran Sampel", "📈 Preview Time Series"])
     with tab1:
         st.pyplot(plot_sample_grid(df_year, sampled_ids, nr, nc))
     with tab2:
         st.pyplot(plot_sample_ts_preview(df_year, sampled_ids, n=3))
+else:
+    st.info("👆 Pilih lokasi di canvas lalu klik **✅ Konfirmasi Seleksi** – hasil akan langsung muncul.")
 
 st.markdown('</div>', unsafe_allow_html=True)
 
 if "sampled_ids" not in st.session_state:
-    st.info("👆 Pilih lokasi di canvas lalu klik **✅ Konfirmasi Seleksi**.")
     st.stop()
 
 
