@@ -28,6 +28,16 @@ from visualization import (
 st.set_page_config(page_title="Fenologi Padi", page_icon="🌾", layout="wide",
                    initial_sidebar_state="collapsed")
 
+if 'selected_ids' in st.query_params:
+    try:
+        ids = json.loads(st.query_params['selected_ids'])
+        if isinstance(ids, list) and len(ids) > 0:
+            st.session_state["sampled_ids"] = ids
+            st.query_params.clear()   # bersihkan supaya tidak berulang
+            st.rerun()
+    except Exception:
+        pass
+
 st.markdown("""
 <style>
   .step-card {
@@ -284,8 +294,8 @@ const ctx    = canvas.getContext('2d');
 // Hitung cell size agar muat di lebar layar
 // Gunakan lebar yang lebih besar, maksimal 1200px
 const WRAP_W = Math.min(window.innerWidth - 40, 1200);
-// Hitung CELL agar grid memenuhi tinggi 700px atau lebar penuh
-const CELL   = Math.max(4, Math.floor(Math.min(WRAP_W / NC, 700 / NR)));
+// Hitung CELL agar grid memenuhi tinggi 600px atau lebar penuh
+const CELL   = Math.max(4, Math.floor(Math.min(WRAP_W / NC, 600 / NR)));
 canvas.width  = NC * CELL;
 canvas.height = NR * CELL;
 
@@ -404,20 +414,11 @@ document.getElementById('btn-confirm').addEventListener('click', () => {{
     return;
   }}
   // Kirim query params ke Streamlit
-  const url = new URL(parent.location);
+  const url = new URL(window.parent.location);
   url.searchParams.set('selected_ids', JSON.stringify(ids));
-  parent.location.href = url.toString();
+  window.parent.location.href = url.toString();
 }});
 </script>
-
-<!-- Output JSON bridge -->
-<div id="json-wrap" style="display:none; margin-top:8px;">
-  <label style="font-size:12px;color:#555;">📋 Salin JSON ini ke field di bawah canvas:</label><br>
-  <textarea id="json-out" rows="3"
-    style="width:100%;font-size:11px;font-family:monospace;border:1px solid #a5d6a7;
-           border-radius:6px;padding:6px;background:#f1f8e9;resize:vertical;"
-    readonly></textarea>
-</div>
 
 </body>
 </html>
@@ -425,54 +426,20 @@ document.getElementById('btn-confirm').addEventListener('click', () => {{
 
 components.html(CANVAS_HTML, height=700, scrolling=False)
 
-# ── Bridge: user copy-paste JSON dari canvas ke sini ─────────
-st.markdown("**Langkah terakhir:** Setelah klik **✅ Confirm Seleksi** di canvas, "
-            "salin JSON yang muncul dan paste ke kolom di bawah ini:")
-
-confirmed_json = st.text_area(
-    "JSON ID Lokasi (dari canvas di atas)",
-    value=st.session_state.get("_canvas_json", ""),
-    height=90,
-    placeholder='["LOC_0001","LOC_0023", ...]  ← paste hasil dari canvas',
-    key="canvas_json_input",
-    label_visibility="collapsed",
-)
-
-c_btn1, c_btn2 = st.columns([2, 5])
-with c_btn1:
-    do_confirm = st.button("🔒 Konfirmasi & Lanjut", type="primary", use_container_width=True)
-
-if do_confirm:
-    raw = confirmed_json.strip()
-    if not raw:
-        st.warning("⚠️ Field kosong — klik Confirm di canvas dulu, lalu paste JSON-nya.")
-    else:
-        try:
-            ids_list = json.loads(raw)
-            if not isinstance(ids_list, list) or len(ids_list) == 0:
-                st.warning("⚠️ JSON tidak valid atau list kosong.")
-            else:
-                st.session_state["sampled_ids"] = ids_list
-                st.session_state["_canvas_json"] = raw
-                st.session_state.pop("pivot_df", None)
-                st.rerun()
-        except json.JSONDecodeError:
-            st.error("❌ Bukan format JSON yang valid. Pastikan copy dari textarea canvas.")
-
 if "sampled_ids" in st.session_state:
     sampled_ids = st.session_state["sampled_ids"]
     st.markdown(f'<span class="badge-ok">✅ {len(sampled_ids):,} lokasi terkonfirmasi</span>',
                 unsafe_allow_html=True)
-
     tab1, tab2 = st.tabs(["🗺️ Peta Sebaran Sampel", "📈 Preview Time Series"])
     with tab1:
         st.pyplot(plot_sample_grid(df_year, sampled_ids, nr, nc))
     with tab2:
         st.pyplot(plot_sample_ts_preview(df_year, sampled_ids, n=3))
+else:
+    st.info("👆 Pilih lokasi di canvas lalu klik **✅ Confirm Seleksi** – halaman akan memproses otomatis.")
 
 st.markdown('</div>', unsafe_allow_html=True)
 if "sampled_ids" not in st.session_state:
-    st.info("👆 Pilih lokasi di canvas lalu klik **Confirm Seleksi** dan **Konfirmasi & Lanjut**.")
     st.stop()
 
 
