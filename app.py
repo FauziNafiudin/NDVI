@@ -41,8 +41,14 @@ st.markdown("""
   .badge-warn { display:inline-block; background:#fff8e1; color:#e65100;
                 border:1px solid #ffe082; border-radius:20px;
                 padding:.2rem .9rem; font-size:.85rem; font-weight:600; }
-  /* sembunyikan bridge input sepenuhnya */
-  [data-testid="stTextInput"] { display:none !important; }
+  /* bridge input: tampilkan tapi readonly style */
+  [data-testid="stTextInput"] input { 
+    font-size: 11px !important; 
+    color: #2e7d32 !important;
+    background: #f1f8e9 !important;
+    border: 1px solid #a5d6a7 !important;
+    cursor: default;
+  }
   footer { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
@@ -344,15 +350,21 @@ document.getElementById('btn-confirm').addEventListener('click',()=>{{
   if(!ids.length){{ msg.textContent='⚠️ Belum ada lokasi dipilih!'; msg.style.color='#e53935'; return; }}
 
   const payload=JSON.stringify(ids);
-  const inputs=window.parent.document.querySelectorAll('input[type=text]');
+  // Cari label dengan teks "lokasi_terpilih", ambil input di wrapper yang sama
   let found=false;
-  inputs.forEach(inp=>{{
-    const wrapper=inp.closest('[data-testid="stTextInput"]');
-    if(wrapper && !found){{
-      const nativeInputValueSetter=Object.getOwnPropertyDescriptor(window.parent.HTMLInputElement.prototype,'value').set;
-      nativeInputValueSetter.call(inp, payload);
-      inp.dispatchEvent(new Event('input',{{bubbles:true}}));
-      found=true;
+  const labels=window.parent.document.querySelectorAll('label');
+  labels.forEach(lbl=>{{
+    if(lbl.textContent.trim()==='lokasi_terpilih'){{
+      const wrapper=lbl.closest('[data-testid="stTextInput"]');
+      if(wrapper){{
+        const inp=wrapper.querySelector('input');
+        if(inp){{
+          const setter=Object.getOwnPropertyDescriptor(window.parent.HTMLInputElement.prototype,'value').set;
+          setter.call(inp, payload);
+          inp.dispatchEvent(new Event('input',{{bubbles:true}}));
+          found=true;
+        }}
+      }}
     }}
   }});
 
@@ -368,8 +380,8 @@ document.getElementById('btn-confirm').addEventListener('click',()=>{{
 components.html(CANVAS_HTML, height=680, scrolling=False)
 
 # ── Bridge input: letaknya DI BAWAH canvas, disembunyikan via CSS ────
-bridge_val = st.text_input("__bridge__", value="", key="canvas_bridge",
-                            label_visibility="collapsed")
+bridge_val = st.text_input("lokasi_terpilih", value="", key="canvas_bridge",
+                            placeholder="ID lokasi akan muncul di sini setelah konfirmasi...")
 
 # ── Proses nilai bridge ketika berubah ───────────────────────
 raw_bridge = st.session_state.get("canvas_bridge", "").strip()
