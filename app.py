@@ -19,6 +19,7 @@ from visualization import (
     plot_comparison,
     plot_individual_clusters,
     plot_spatial_map,
+    plot_smoothing_preview,
 )
 
 # ─────────────────────────────────────────────
