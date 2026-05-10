@@ -6,6 +6,7 @@ import seaborn as sns
 from matplotlib.colors import ListedColormap
 from matplotlib.patches import Patch
 import re
+import random
 
 
 # ── HELPER ────────────────────────────────────────────────────
@@ -220,4 +221,26 @@ def plot_spatial_map(df, nr, nc, valid_statuses):
                   for i, s in enumerate(valid_statuses)]
     ax.legend(handles=legend_els, title='Cluster', bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.subplots_adjust(right=0.75)
+    return fig
+
+def plot_smoothing_preview(df_smooth, n=3):
+    """Preview perbandingan NDVI asli vs NDVI smooth untuk n lokasi acak."""
+    locs = df_smooth['id_lokasi'].unique()
+    preview = random.sample(list(locs), k=min(n, len(locs)))
+    fig, axes = plt.subplots(1, len(preview), figsize=(5*len(preview), 4), sharey=True)
+    if len(preview) == 1:
+        axes = [axes]
+    for ax, loc in zip(axes, preview):
+        sub = df_smooth[df_smooth['id_lokasi'] == loc].sort_values('tanggal')
+        # NDVI asli dengan transparan
+        ax.plot(sub['tanggal'], sub['NDVI'], color='gray', alpha=0.4, linewidth=1.5, label='NDVI Asli')
+        # NDVI smooth solid
+        ax.plot(sub['tanggal'], sub['NDVI_smooth'], color='#1f77b4', linewidth=2, label='Smoothed')
+        ax.set_title(loc, fontsize=9, fontweight='bold')
+        ax.grid(True, alpha=0.3, linestyle='--')
+        ax.tick_params(axis='x', rotation=30, labelsize=7)
+    axes[0].set_ylabel('NDVI')
+    axes[0].legend(loc='upper right', fontsize=7)
+    plt.suptitle('Perbandingan NDVI Asli vs Smooth (Savitzky‑Golay)', fontweight='bold', y=1.02)
+    plt.tight_layout()
     return fig
