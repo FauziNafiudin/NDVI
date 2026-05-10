@@ -148,6 +148,8 @@ if "df_smooth" in st.session_state:
     n_ts = df_year["tanggal"].nunique()
     st.markdown(f'<span class="badge-ok">✅ {df_year["id_lokasi"].nunique():,} lokasi × {n_ts} hari</span>',
                 unsafe_allow_html=True)
+    with st.expander("🔬 Contoh Smoothing (NDVI Asli vs Smooth)", expanded=True):
+        st.pyplot(plot_smoothing_preview(df_year, n=3))      
 
 st.markdown('</div>', unsafe_allow_html=True)
 if "df_smooth" not in st.session_state:
