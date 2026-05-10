@@ -148,8 +148,6 @@ if "df_smooth" in st.session_state:
     n_ts = df_year["tanggal"].nunique()
     st.markdown(f'<span class="badge-ok">✅ {df_year["id_lokasi"].nunique():,} lokasi × {n_ts} hari</span>',
                 unsafe_allow_html=True)
-    with st.expander("🗺️ Peta Grid Seluruh Lokasi", expanded=False):
-        st.pyplot(plot_grid_preview(df_year, nr, nc))
 
 st.markdown('</div>', unsafe_allow_html=True)
 if "df_smooth" not in st.session_state:
