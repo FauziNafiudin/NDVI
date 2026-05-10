@@ -333,7 +333,7 @@ document.getElementById('btn-clear').addEventListener('click',()=>{{
   selected.fill(0); draw();
 }});
 
-// Konfirmasi → inject ke Streamlit text input (key "bridge_input")
+// Konfirmasi → inject ke hidden Streamlit text_input (key "canvas_bridge")
 document.getElementById('btn-confirm').addEventListener('click',()=>{{
   const ids=[];
   for(let r=0;r<NR;r++) for(let c=0;c<NC;c++){{
@@ -350,17 +350,16 @@ document.getElementById('btn-confirm').addEventListener('click',()=>{{
       if(wrapper){{
         const inp=wrapper.querySelector('input');
         if(inp){{
-          // gunakan React internal setter agar Streamlit mendeteksi perubahan
-          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-          nativeInputValueSetter.call(inp, payload);
-          inp.dispatchEvent(new Event('input', {{ bubbles: true }}));
-          inp.dispatchEvent(new Event('change', {{ bubbles: true }}));
+          const nativeValueSetter=Object.getOwnPropertyDescriptor(window.parent.HTMLInputElement.prototype,'value').set;
+          nativeValueSetter.call(inp, payload);
+          inp.dispatchEvent(new Event('input',{{bubbles:true}}));
+          inp.dispatchEvent(new Event('change',{{bubbles:true}}));
           inp.dispatchEvent(new Event('blur'));
         }}
       }}
     }}
   }});
-  msg.textContent='✅ '+ids.length+' lokasi dikonfirmasi. Scroll ke bawah → klik "Proses Sampel".';
+  msg.textContent='✅ '+ids.length+' lokasi terkirim. Tunggu sebentar, tombol Proses akan muncul.';
   msg.style.color='#2e7d32';
 }});
 </script>
@@ -369,37 +368,46 @@ document.getElementById('btn-confirm').addEventListener('click',()=>{{
 
 components.html(CANVAS_HTML, height=680, scrolling=False)
 
-# Input tersembunyi untuk menerima data dari canvas
-bridge_val = st.text_input(
-    "lokasi_terpilih",
-    key="bridge_input",
-    label_visibility="collapsed"
-)
-
-# Tombol Proses Sampel (selalu tampil)
-if st.button("▶ Proses Sampel", type="primary", use_container_width=True, key="btn_proses_sampel"):
-    raw = st.session_state.get("bridge_input", "").strip()
-    if raw:
+# ── Callback otomatis: terima data dari canvas tanpa perlu Enter ──
+def bridge_callback():
+    raw = st.session_state.get("canvas_bridge", "").strip()
+    if raw and raw != st.session_state.get("_bridge_prev", ""):
         try:
             ids_list = json.loads(raw)
             if isinstance(ids_list, list) and len(ids_list) > 0:
                 st.session_state["sampled_ids"] = ids_list
-                st.session_state["show_sample_result"] = True
-                st.session_state.pop("pivot_df", None)
-                st.session_state.pop("dist_matrix", None)
-                st.rerun()
+                st.session_state["_bridge_prev"] = raw
+                # Bersihkan state lain yang mungkin perlu di-reset
+                for k in ["pivot_df", "dist_matrix", "show_sample_result"]:
+                    st.session_state.pop(k, None)
+                st.rerun()   # agar tombol Proses langsung muncul
         except json.JSONDecodeError:
-            st.error("❌ Format JSON tidak valid dari canvas.")
-    else:
-        st.warning("⚠️ Klik **Konfirmasi Seleksi** di canvas terlebih dahulu.")
+            pass
 
-# Tampilkan hasil sampling jika sudah ada
-if st.session_state.get("show_sample_result") and "sampled_ids" in st.session_state:
+# Input tersembunyi – diisi oleh JavaScript, callback otomatis saat nilai berubah
+st.text_input(
+    "lokasi_terpilih",
+    key="canvas_bridge",
+    on_change=bridge_callback,
+    label_visibility="collapsed"
+)
+
+# ── Tombol Proses Sampel (muncul setelah sampled_ids tersedia) ──
+if "sampled_ids" in st.session_state:
     sampled_ids = st.session_state["sampled_ids"]
     st.markdown(
         f'<span class="badge-ok">✅ {len(sampled_ids):,} lokasi terkonfirmasi</span>',
         unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
+
+    if st.button("▶ Proses Sampel", type="primary", use_container_width=True,
+                 key="btn_proses_sampel"):
+        st.session_state["show_sample_result"] = True
+        st.rerun()
+
+# ── Tampilkan hasil sampling setelah tombol Proses ditekan ──
+if st.session_state.get("show_sample_result") and "sampled_ids" in st.session_state:
+    sampled_ids = st.session_state["sampled_ids"]
     tab1, tab2 = st.tabs(["🗺️ Peta Sebaran Sampel", "📈 Preview Time Series"])
     with tab1:
         st.pyplot(plot_sample_grid(df_year, sampled_ids, nr, nc))
@@ -409,10 +417,7 @@ if st.session_state.get("show_sample_result") and "sampled_ids" in st.session_st
 st.markdown('</div>', unsafe_allow_html=True)
 
 if "sampled_ids" not in st.session_state:
-    st.info(
-        "👆 Pilih lokasi di canvas → klik **✅ Konfirmasi Seleksi** → "
-        "lalu klik **▶ Proses Sampel** di bawah ini untuk melanjutkan."
-    )
+    st.info("👆 Pilih lokasi di canvas lalu klik **✅ Konfirmasi Seleksi** – tombol Proses akan muncul.")
     st.stop()
 
 # ═══════════════════════════════════════════════════════
