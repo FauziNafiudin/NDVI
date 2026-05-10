@@ -92,11 +92,15 @@ if "df_raw" not in st.session_state:
     st.stop()
 
 
-# ═══════════════════════════════════════════════════════
-#  STEP 2 — PILIH TAHUN
-# ═══════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════
+STEP 2 — PILIH TAHUN
+═══════════════════════════════════════════════════════
 st.markdown('<hr class="step-divider">', unsafe_allow_html=True)
 st.markdown('<div class="step-card"><h3>📅 Step 2 — Pilih Tahun Analisis</h3>', unsafe_allow_html=True)
+
+# 🆕 Tampilkan peta grid seluruh lokasi SEBELUM pemilihan tahun
+with st.expander("🗺️ Peta Grid Seluruh Lokasi (Semua Tahun)", expanded=False):
+    st.pyplot(plot_grid_preview(df_raw, nr, nc))
 
 c1, c2, _ = st.columns([1, 1, 5])
 for yr, col in [("2023", c1), ("2024", c2)]:
@@ -105,8 +109,8 @@ for yr, col in [("2023", c1), ("2024", c2)]:
         if st.session_state.get("tahun") != yr:
             for k in ["df_smooth", "df_year", "sampled_ids", "pivot_df"]:
                 st.session_state.pop(k, None)
-        st.session_state["tahun"] = yr
-        st.rerun()
+            st.session_state["tahun"] = yr
+            st.rerun()
 
 if "tahun" in st.session_state:
     st.markdown(f'<span class="badge-ok">✅ Tahun: {st.session_state["tahun"]}</span>',
