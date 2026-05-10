@@ -61,26 +61,36 @@ def plot_grid_preview(df, nr, nc):
 # ── STEP 4: SAMPLE GRID (hasil konfirmasi canvas) ────────────
 
 def plot_sample_grid(df_year, sampled_ids, nr, nc):
-    """Peta dengan highlight lokasi yang disampling (oranye)."""
+    """Peta dengan highlight lokasi yang disampling (biru) & latar hijau transparan."""
     sampled_set = set(sampled_ids)
     id_to_pos = df_year[['id_lokasi', 'grid_row', 'grid_col']].drop_duplicates('id_lokasi')
 
+    # Grid dengan nilai: 0 = kosong, 1 = tidak tersampling, 2 = tersampling
     grid = np.zeros((nr, nc), dtype=int)
     for _, row in id_to_pos.iterrows():
         grid[int(row['grid_row']), int(row['grid_col'])] = 2 if row['id_lokasi'] in sampled_set else 1
 
+    # Warna dengan alpha untuk latar hijau transparan
+    color_empty    = '#D3D3D3'           # abu‑abu
+    color_unsel    = (0.3, 0.8, 0.3, 0.4)  # hijau semi‑transparan
+    color_sampled  = '#2196F3'           # biru
+
+    cmap = ListedColormap([color_empty, color_unsel, color_sampled])
+
     fig, ax = plt.subplots(figsize=(9, 7))
     ax.pcolormesh(np.arange(nc + 1), np.arange(nr + 1), grid,
-                  cmap=ListedColormap(['#D3D3D3', '#B8D4B8', '#FF5722']),
-                  vmin=0, vmax=2, edgecolors='white', linewidth=0.3, shading='auto')
+                  cmap=cmap, vmin=0, vmax=2,
+                  edgecolors='white', linewidth=0.3, shading='auto')
     ax.invert_yaxis()
     ax.set_aspect('equal')
     ax.set_title(f'Lokasi Tersampling: {len(sampled_ids):,}', fontweight='bold', fontsize=13)
-    ax.legend(handles=[
-        Patch(facecolor='#FF5722', edgecolor='white', label=f'Tersampling ({len(sampled_ids):,})'),
-        Patch(facecolor='#B8D4B8', edgecolor='white', label='Tidak Tersampling'),
-        Patch(facecolor='#D3D3D3', edgecolor='white', label='Kosong'),
-    ], loc='upper right')
+
+    legend_handles = [
+        Patch(facecolor=color_sampled, edgecolor='white', label=f'Tersampling ({len(sampled_ids):,})'),
+        Patch(facecolor=color_unsel,   edgecolor='white', label='Tidak Tersampling'),
+        Patch(facecolor=color_empty,   edgecolor='white', label='Kosong'),
+    ]
+    ax.legend(handles=legend_handles, loc='upper right')
     plt.tight_layout()
     return fig
 
